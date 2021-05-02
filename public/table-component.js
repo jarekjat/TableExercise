@@ -28,19 +28,23 @@ class TableComponent extends HTMLElement {
 
         switch(name){
             case 'columns':{
-                
+                console.log("attributeChangedCallback " + name)
+                this.createTableHeaders(this.getAttribute('columns').split(','))
                 break
             }
             case 'data':{
-
+                console.log("attributeChangedCallback data")
+                this.insertAllData(this.getAttribute('data'))
                 break
             }
             case 'summary':{
-
+                console.log("attributeChangedCallback summary")
+                this.getSummary(this.getAttribute('summary'))
                 break
             }
             case 'fill-data-rules':{
-
+                console.log("attributeChangedCallback filldatarules")
+                this.applyDataRules(this.getAttribute('fill-data-rules'))
                 break
             }
         }
@@ -49,24 +53,29 @@ class TableComponent extends HTMLElement {
 
     connectedCallback() {
         if(!this.getAttribute('columns')){
-            throw Error("Columns attribute missing")
+            throw new Error("Columns attribute missing")
         }
         else{
-            console.log(this.getAttribute('columns'))
+            console.log("connectedCallback columns")
+            if(this.getAttribute('columns').split(',') < 1) throw new Error("There should be at least one column in the columns attribute")
             this.createTableHeaders(this.getAttribute('columns').split(','))
         }
         if(!this.getAttribute('data')){
-            throw Error("Data attribute missing")
+            throw new Error("Data attribute missing")
         }
         else{
+            console.log("connectedCallback data")
             this.insertAllData(this.getAttribute('data'))
         }
         if(this.getAttribute('summary')){
+            console.log("connectedCallback summary")
             this.getSummary(this.getAttribute('summary'))
         }
         if(this.getAttribute('fill-data-rules')){
-
+            console.log("connectedCallback fill-data-rules")
+            this.applyDataRules(this.getAttribute('fill-data-rules'))
         }
+
         let attributes = this.getAttributeNames().map(
             (attr) => {
                 return {'attribute': attr, 'value': this.getAttribute(attr)}
@@ -114,12 +123,16 @@ class TableComponent extends HTMLElement {
     getValueForSummarizedColumnsFooter(typeOfSummary, whichColumn){
         switch(typeOfSummary.toLowerCase()){
             case 'count':{
-
-                return '-'
+                const columnDataArray = this.getColumnData(whichColumn)
+                let set = new Set()
+                columnDataArray.forEach(element=>{
+                    if(element.textContent != "x") set.add(element.textContent)
+                })
+                return set.size
             }
             case 'avg':{
                 const columnDataArray = this.getColumnData(whichColumn)
-                return getSumFromArray(columnDataArray)/columnDataArray.length
+                return (getSumFromArray(columnDataArray)/columnDataArray.length).toFixed(2)
             }
             case 'sum':{
                 const columnDataArray = this.getColumnData(whichColumn)
@@ -138,15 +151,65 @@ class TableComponent extends HTMLElement {
             }
             return sum
         }
-        
     }
     getColumnData(whichColumn) {
-        const tableBodyRows = this.table.tBodies[0]
         let valueForCellsInSelectedColumn = []
-            for(let i = 0;i < tableBodyRows.rows.length;++i){
-                valueForCellsInSelectedColumn.push(tableBodyRows.rows[i].cells[whichColumn]) 
+        for(let i = 0;i < this.table.tBodies.length;++i){
+            const tableBodyRows = this.table.tBodies[i]
+            for(let j = 0;j < tableBodyRows.rows.length;++j){
+                valueForCellsInSelectedColumn.push(tableBodyRows.rows[j].cells[whichColumn]) 
             }
+        }
             return valueForCellsInSelectedColumn
+    }
+    applyDataRules(rulesString){
+        const rulesArray = rulesString.split(',')
+        for(let i = 0;i < rulesArray.length;++i){
+            const regExpToMatch = new RegExp("[0-9]")
+            //if(!regExpToMatch.test(rulesArray[i])) throw new Error("Incorrect syntax in fill-data-rule no " + rulesArray[i])
+            const operationSign = rulesArray[i].charAt(3)
+            const digitsArray = rulesArray[i].split(/[+*\/-]/)
+            const first = this.getColumnData(digitsArray[1]) 
+            const second = this.getColumnData(digitsArray[2]) 
+            let arrayToInsert = []
+            switch(operationSign){
+                case "*":{
+                    for(let j = 0;j < first.length;++j){
+                        arrayToInsert.push(first[j]*second[j])
+                    }
+                }
+                case "/":{
+                    for(let j = 0;j < first.length;++j){
+                        arrayToInsert.push(first[j]/second[j])
+                    }
+                }
+                case "+":{
+                    for(let j = 0;j < first.length;++j){
+                        arrayToInsert.push(first[j]+second[j])
+                    }
+                }
+                case "-":{
+                    for(let j = 0;j < first.length;++j){
+                        arrayToInsert.push(first[j]-second[j])
+                    }
+                }
+                default:{
+                    break
+                }
+            }
+            this.changeValuesInColumn(digitsArray[0], arrayToInsert)
+        }
+        
+    }
+    changeValuesInColumn(whichColumn, arrayWithData){
+        let allTheRows = 0
+        for(let bodiesIterator = 0;bodiesIterator < this.table.tBodies.length;++bodiesIterator){
+            const column = this.table.tBodies[bodiesIterator]
+            for(let rowsIterator = 0;rowsIterator < column.rows.length;++rowsIterator){
+                column.rows[rowsIterator].cells[whichColumn] = arrayWithData[allTheRows]//wywali się jak w switchu będzie default
+                ++allTheRows
+            }
+        }
     }
     disconnectedCallback() {
         console.log(`Disconnecting!`);
