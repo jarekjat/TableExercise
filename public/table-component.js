@@ -1,4 +1,4 @@
-export default class TableComponent extends HTMLElement {
+class TableComponent extends HTMLElement {
     constructor() {
         super();
         this.nullCharacter = "x"
