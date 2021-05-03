@@ -1,6 +1,7 @@
 export default class TableComponent extends HTMLElement {
     constructor(columns, data, summary, fillDataRules) {
         super();
+        this.nullCharacter = "x"
         //this.columns = this.columns.bind(this)
         // this.columns = columns
         // this.data = data
@@ -8,7 +9,6 @@ export default class TableComponent extends HTMLElement {
         // this.fillDataRules = fillDataRules
         this.attachShadow({mode: 'open'})
          this.table = document.createElement("table")
-
         this.shadowRoot.append(this.table)
     }
 
@@ -20,24 +20,20 @@ export default class TableComponent extends HTMLElement {
 
         switch(name){
             case 'columns':{
-                console.log("attributeChangedCallback " + name)
                 this.createTableHeaders()
                 break
             }
             case 'data':{
-                console.log("attributeChangedCallback data")
                 this.insertAllData()
                 this.getSummary()
                 this.applyDataRules()
                 break
             }
             case 'summary':{
-                console.log("attributeChangedCallback summary")
                 this.getSummary()
                 break
             }
             case 'fill-data-rules':{
-                console.log("attributeChangedCallback filldatarules")
                 this.applyDataRules()
                 this.getSummary()
                 break
@@ -97,7 +93,7 @@ export default class TableComponent extends HTMLElement {
         let i = 0
         dataArray.forEach(element => {
             let cell = row.insertCell(i)
-            if(element === "") cell.textContent = "x"
+            if(element === "") cell.textContent = this.nullCharacter
             else cell.textContent = element
             console.log(element)
             ++i
@@ -123,31 +119,31 @@ export default class TableComponent extends HTMLElement {
                 const columnDataArray = this.getColumnData(whichColumn)
                 let set = new Set()
                 columnDataArray.forEach(element=>{
-                    if(element != "x") set.add(element)
+                    if(!this.whetherEqualsNullCharacter(element)) set.add(element)
                 })
                 return set.size
             }
             case 'avg':{
                 const columnDataArray = this.getColumnData(whichColumn)
-                return (getSumFromArray(columnDataArray)/columnDataArray.length).toFixed(2)
+                return (this.getSumFromArray(columnDataArray)/columnDataArray.length).toFixed(2)
             }
             case 'sum':{
                 const columnDataArray = this.getColumnData(whichColumn)
-                return getSumFromArray(columnDataArray)
+                return this.getSumFromArray(columnDataArray)
             }
             default:{
                 return '-'
             }
         }
-        function getSumFromArray(array){
-            let sum = 0
-            for(let i = 0;i < array.length;++i){
-                console.log(array[i])
-                if(array[i] === "x") sum += 0
-                else sum += +array[i]
-            }
-            return sum
+    }
+    getSumFromArray(array){
+        let sum = 0
+        for(let i = 0;i < array.length;++i){
+            console.log(array[i])
+            if(this.whetherEqualsNullCharacter(array[i])) sum += 0
+            else sum += +array[i]
         }
+        return sum
     }
     getColumnData(whichColumn) {
         let valueForCellsInSelectedColumn = []
@@ -163,8 +159,8 @@ export default class TableComponent extends HTMLElement {
         const rulesString = this.getAttribute('fill-data-rules')
         const rulesArray = rulesString.split(',')
         for(let i = 0;i < rulesArray.length;++i){
-            const regExpToMatch = new RegExp("[0-9]")
-            //if(!regExpToMatch.test(rulesArray[i])) throw new Error("Incorrect syntax in fill-data-rule no " + rulesArray[i])
+            const regExpToMatch = new RegExp("[0-9]+=[0-9]+[+*\/-][0-9]+")
+            if(!regExpToMatch.test(rulesArray[i])) throw new Error("Incorrect syntax in fill-data-rule " + rulesArray[i])
             const operationSign = rulesArray[i].charAt(3)
             const digitsArray = rulesArray[i].split(/[=+*\/-]/)
             const first = this.getColumnData(digitsArray[1]) 
@@ -173,7 +169,7 @@ export default class TableComponent extends HTMLElement {
             let secondIterator = 0
             switch(operationSign){
                 case "*":{
-                    //arrayToInsert = first.map(x =>{+x * +second[secondIterator]; ++secondIterator} )
+                  //  arrayToInsert = first.map(x =>{ ++secondIterator; return(+x * (+second[secondIterator]))  } )
                     for(let j = 0;j < first.length;++j){
                         arrayToInsert.push(+first[j]*(+second[j]))
                     }
@@ -206,13 +202,17 @@ export default class TableComponent extends HTMLElement {
             const column = this.table.tBodies[bodiesIterator]
             for(let rowsIterator = 0;rowsIterator < column.rows.length;++rowsIterator){
                 console.log("Change values in column " + column.rows[rowsIterator].cells[whichColumn].textContent )
-                if(column.rows[rowsIterator].cells[whichColumn].textContent === "x"){
+                if(this.whetherEqualsNullCharacter(column.rows[rowsIterator].cells[whichColumn].textContent)){
                     column.rows[rowsIterator].cells[whichColumn].textContent = arrayWithData[allTheRows]
                 }
                 //wywali się jak w switchu będzie default
                 ++allTheRows
             }
         }
+    }
+    whetherEqualsNullCharacter(value){
+        if(value === this.nullCharacter) return true
+        else return false
     }
     disconnectedCallback() {
         console.log(`Disconnecting!`);
