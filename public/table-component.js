@@ -1,4 +1,4 @@
-class TableComponent extends HTMLElement {
+export default class TableComponent extends HTMLElement {
     constructor(columns, data, summary, fillDataRules) {
         super();
         //this.columns = this.columns.bind(this)
@@ -11,15 +11,7 @@ class TableComponent extends HTMLElement {
 
         this.shadowRoot.append(this.table)
     }
-    set columns(newColumns){
-        this.setAttribute('columns',newColumns)
-    }
-    get columns(){
-        return this.getAttribute('columns')
-    }
-    set data(newData){
-        this.setAttribute('data',newData)
-    }
+
     static get observedAttributes() {
         return ['columns','data','summary','fill-data-rules'];
     }
@@ -29,52 +21,36 @@ class TableComponent extends HTMLElement {
         switch(name){
             case 'columns':{
                 console.log("attributeChangedCallback " + name)
-                this.createTableHeaders(this.getAttribute('columns').split(','))
+                this.createTableHeaders()
                 break
             }
             case 'data':{
                 console.log("attributeChangedCallback data")
-                this.insertAllData(this.getAttribute('data'))
+                this.insertAllData()
+                this.getSummary()
+                this.applyDataRules()
                 break
             }
             case 'summary':{
                 console.log("attributeChangedCallback summary")
-                this.getSummary(this.getAttribute('summary'))
+                this.getSummary()
                 break
             }
             case 'fill-data-rules':{
                 console.log("attributeChangedCallback filldatarules")
-                this.applyDataRules(this.getAttribute('fill-data-rules'))
+                this.applyDataRules()
+                this.getSummary()
                 break
             }
         }
         console.log(`Changed ${name} from ${oldValue} to ${newValue}`);
     }
 
-    connectedCallback() {
-        if(!this.getAttribute('columns')){
-            throw new Error("Columns attribute missing")
-        }
-        else{
-            console.log("connectedCallback columns")
-            if(this.getAttribute('columns').split(',') < 1) throw new Error("There should be at least one column in the columns attribute")
-            this.createTableHeaders(this.getAttribute('columns').split(','))
-        }
-        if(!this.getAttribute('data')){
-            throw new Error("Data attribute missing")
-        }
-        else{
-            console.log("connectedCallback data")
-            this.insertAllData(this.getAttribute('data'))
-        }
-        if(this.getAttribute('summary')){
-            console.log("connectedCallback summary")
-            this.getSummary(this.getAttribute('summary'))
-        }
-        if(this.getAttribute('fill-data-rules')){
-            console.log("connectedCallback fill-data-rules")
-            this.applyDataRules(this.getAttribute('fill-data-rules'))
-        }
+    connectedCallback(){
+        this.createTableHeaders()
+        this.insertAllData()
+        if(this.getAttribute('fill-data-rules')) this.applyDataRules()
+        if(this.getAttribute('summary')) this.getSummary()
 
         let attributes = this.getAttributeNames().map(
             (attr) => {
@@ -82,15 +58,34 @@ class TableComponent extends HTMLElement {
             });
 
         console.table(attributes);
-
     }
-    createTableHeaders(columns) {
+    createTableHeaders() {
+        if(!this.getAttribute('columns')) throw new Error("Columns attribute missing")
+        const columns = this.getAttribute('columns').split(',')
+        if(this.table.tHead) this.table.tHead.remove()
         const tableHead = this.table.createTHead()
         const row = tableHead.insertRow(0);
         this.insertRowData(row,columns)
     }
-    insertAllData(allDataString){
+    async getTextFromFile(path){
+        let response
+        response = await fetch(path,{
+            method: "GET",
+            mode: "no-cors"
+        })
+        .then(res =>{
+            res.text()
+        }).then(v => Papa.parse(v))
+        
+        //.then(data => console.log(data))
+        console.log(response)
+        return response
+        }
+    insertAllData(){
+        if(!this.getAttribute('data')) throw new Error("Data attribute missing")
+        const allDataString = this.getAttribute('data')
         const dataSplitToRows = allDataString.split(';')
+        if(this.table.tBodies[0]) this.table.tBodies[0].remove()
         const tableBody = this.table.createTBody()
         for(let i = 0;i < dataSplitToRows.length;++i){
             const dataSplitToCells = dataSplitToRows[i].split(',')
@@ -108,7 +103,8 @@ class TableComponent extends HTMLElement {
             ++i
         });
     }
-    getSummary(typesOfAggregationInString){
+    getSummary(){
+        const typesOfAggregationInString = this.getAttribute('summary')
         const typesOfAggregationInArray = typesOfAggregationInString.split(',')
         let summaryDataArray = []
         let i = 0
@@ -116,6 +112,7 @@ class TableComponent extends HTMLElement {
             summaryDataArray.push(this.getValueForSummarizedColumnsFooter(element,i)) 
             ++i
         })
+        if(this.table.tFoot) this.table.tFoot.remove()
         const tableFooter = this.table.createTFoot()
         let row = tableFooter.insertRow(0)
         this.insertRowData(row,summaryDataArray)
@@ -126,7 +123,7 @@ class TableComponent extends HTMLElement {
                 const columnDataArray = this.getColumnData(whichColumn)
                 let set = new Set()
                 columnDataArray.forEach(element=>{
-                    if(element.textContent != "x") set.add(element.textContent)
+                    if(element != "x") set.add(element)
                 })
                 return set.size
             }
@@ -145,9 +142,9 @@ class TableComponent extends HTMLElement {
         function getSumFromArray(array){
             let sum = 0
             for(let i = 0;i < array.length;++i){
-                console.log(array[i].textContent)
-                if(array[i].innerHTML === "x") sum += 0
-                else sum += +array[i].innerHTML
+                console.log(array[i])
+                if(array[i] === "x") sum += 0
+                else sum += +array[i]
             }
             return sum
         }
@@ -157,63 +154,68 @@ class TableComponent extends HTMLElement {
         for(let i = 0;i < this.table.tBodies.length;++i){
             const tableBodyRows = this.table.tBodies[i]
             for(let j = 0;j < tableBodyRows.rows.length;++j){
-                valueForCellsInSelectedColumn.push(tableBodyRows.rows[j].cells[whichColumn]) 
+                valueForCellsInSelectedColumn.push(tableBodyRows.rows[j].cells[whichColumn].textContent) 
             }
         }
             return valueForCellsInSelectedColumn
     }
-    applyDataRules(rulesString){
+    applyDataRules(){
+        const rulesString = this.getAttribute('fill-data-rules')
         const rulesArray = rulesString.split(',')
         for(let i = 0;i < rulesArray.length;++i){
             const regExpToMatch = new RegExp("[0-9]")
             //if(!regExpToMatch.test(rulesArray[i])) throw new Error("Incorrect syntax in fill-data-rule no " + rulesArray[i])
             const operationSign = rulesArray[i].charAt(3)
-            const digitsArray = rulesArray[i].split(/[+*\/-]/)
+            const digitsArray = rulesArray[i].split(/[=+*\/-]/)
             const first = this.getColumnData(digitsArray[1]) 
             const second = this.getColumnData(digitsArray[2]) 
             let arrayToInsert = []
+            let secondIterator = 0
             switch(operationSign){
                 case "*":{
+                    //arrayToInsert = first.map(x =>{+x * +second[secondIterator]; ++secondIterator} )
                     for(let j = 0;j < first.length;++j){
-                        arrayToInsert.push(first[j]*second[j])
+                        arrayToInsert.push(+first[j]*(+second[j]))
                     }
                 }
                 case "/":{
                     for(let j = 0;j < first.length;++j){
-                        arrayToInsert.push(first[j]/second[j])
+                        arrayToInsert.push(+first[j]/(+second[j]))
                     }
                 }
                 case "+":{
                     for(let j = 0;j < first.length;++j){
-                        arrayToInsert.push(first[j]+second[j])
+                        arrayToInsert.push(+first[j]+(+second[j]))
                     }
                 }
                 case "-":{
                     for(let j = 0;j < first.length;++j){
-                        arrayToInsert.push(first[j]-second[j])
+                        arrayToInsert.push(first[j]-(+second[j]))
                     }
                 }
                 default:{
                     break
                 }
             }
-            this.changeValuesInColumn(digitsArray[0], arrayToInsert)
+            this.changeValuesInColumn(+digitsArray[0], arrayToInsert)
         }
-        
     }
     changeValuesInColumn(whichColumn, arrayWithData){
         let allTheRows = 0
         for(let bodiesIterator = 0;bodiesIterator < this.table.tBodies.length;++bodiesIterator){
             const column = this.table.tBodies[bodiesIterator]
             for(let rowsIterator = 0;rowsIterator < column.rows.length;++rowsIterator){
-                column.rows[rowsIterator].cells[whichColumn] = arrayWithData[allTheRows]//wywali się jak w switchu będzie default
+                console.log("Change values in column " + column.rows[rowsIterator].cells[whichColumn].textContent )
+                if(column.rows[rowsIterator].cells[whichColumn].textContent === "x"){
+                    column.rows[rowsIterator].cells[whichColumn].textContent = arrayWithData[allTheRows]
+                }
+                //wywali się jak w switchu będzie default
                 ++allTheRows
             }
         }
     }
     disconnectedCallback() {
         console.log(`Disconnecting!`);
-
         this.destroy();
     }
 
