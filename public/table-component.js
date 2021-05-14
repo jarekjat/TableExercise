@@ -151,20 +151,15 @@ class TableComponent extends HTMLElement {
     getValueForSummarizedColumnsFooter(typeOfSummary, whichColumn){
         
         let getSumFromArray = (array)=>{
-            let sum = 0
-            for(let i = 0;i < array.length;++i){
-                if(this.whetherEqualsNullCharacter(array[i])) sum += 0
-                else sum += +array[i]
-            }
-            return sum
+            return array.reduce((sum,element)=>{
+                if(this.whetherEqualsNullCharacter(element)) return +sum + 0
+                else return sum + +element
+            } ,0)
         }
-        let getNonNullArrayLength = (array)=>{
-            let nonNullLength = 0
-                    array.forEach(element=>{
-                        if(!this.whetherEqualsNullCharacter(element)) nonNullLength++
-                    })
-            return nonNullLength
-        }
+        let getNonNullArrayLength = (array) =>{
+            array.filter(element => !this.whetherEqualsNullCharacter(element)).length
+        } 
+        
 
         switch(typeOfSummary.toLowerCase()){
             case 'count':{
@@ -216,21 +211,25 @@ class TableComponent extends HTMLElement {
                     for(let j = 0;j < first.length;++j){
                         arrayToInsert.push(+first[j]*(+second[j]))
                     }
+                    break
                 }
                 case "/":{
                     for(let j = 0;j < first.length;++j){
                         arrayToInsert.push(+first[j]/(+second[j]))
                     }
+                    break
                 }
                 case "+":{
                     for(let j = 0;j < first.length;++j){
                         arrayToInsert.push(+first[j]+(+second[j]))
                     }
+                    break
                 }
                 case "-":{
                     for(let j = 0;j < first.length;++j){
                         arrayToInsert.push(first[j]-(+second[j]))
                     }
+                    break
                 }
                 default:{
                     break
